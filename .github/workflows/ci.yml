@@ -82,7 +82,7 @@ jobs:
           github.event_name == 'push' &&
           github.actor != 'dependabot[bot]' &&
           github.repository == github.event.repository.full_name
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
