@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Repository</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        :root {
+            --primary: #1095c1;
+            --primary-hover: #086788;
+        }
+        .container {
+            padding: 2rem 1rem;
+        }
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+            background: linear-gradient(45deg, var(--primary), var(--primary-hover));
+            color: white;
+            margin-bottom: 2rem;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        .feature-card {
+            padding: 1.5rem;
+            border-radius: 8px;
+            background: var(--card-background-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header class="hero">
+            <h1>Template Repository</h1>
+            <p>A comprehensive template with built-in CI/CD pipelines, code quality tools, and development configurations.</p>
+        </header>
+
+        <section class="features">
+            <article class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>CI/CD Pipeline</h3>
+                <p>Automated testing, linting, and deployment with GitHub Actions and Semaphore CI.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Code Quality</h3>
+                <p>Integrated with Codacy for automated code reviews and quality metrics.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>Security</h3>
+                <p>Security scanning with Snyk and automated dependency updates with Dependabot.</p>
+            </article>
+        </section>
+
+        <section>
+            <h2>Getting Started</h2>
+            <pre><code>git clone https://github.com/erichamilt0n/template-repo.git
+cd template-repo
+npm install
+npm run prepare</code></pre>
+        </section>
+
+        <section>
+            <h2>Features</h2>
+            <ul>
+                <li>GitHub Actions CI/CD pipeline</li>
+                <li>Code quality checks with Codacy</li>
+                <li>Security scanning with Snyk</li>
+                <li>Performance metrics with Grafana</li>
+                <li>Multiple CI platform support</li>
+                <li>Vercel deployment configuration</li>
+                <li>Testing setup with Jest</li>
+                <li>Code formatting with Prettier and ESLint</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>
+                <a href="https://github.com/erichamilt0n/template-repo" role="button">View on GitHub</a>
+                <a href="https://github.com/erichamilt0n/template-repo/blob/main/CONTRIBUTING.md" role="button" class="secondary">Contributing</a>
+            </p>
+        </footer>
+    </main>
+</body>
+</html>
