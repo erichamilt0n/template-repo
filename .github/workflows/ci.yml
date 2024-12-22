@@ -1,0 +1,285 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+# Prevent concurrent deployments
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Run npm audit
+        run: npm audit
+        
+      - name: Run ESLint
+        run: npm run lint
+        
+      - name: Check Code Formatting
+        run: npm run format:check
+
+  test:
+    name: Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        node-version: ['16', '18', '20']
+      fail-fast: false
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm test
+        
+      - name: Upload Coverage Reports
+        if: |
+          github.event_name == 'push' &&
+          github.actor != 'dependabot[bot]' &&
+          github.repository == github.event.repository.full_name
+        uses: codecov/codecov-action@v3
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
+
+  security:
+    name: Security Scan
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Run Snyk Security Scan
+        if: |
+          github.event_name == 'push' &&
+          github.actor != 'dependabot[bot]' &&
+          github.repository == github.event.repository.full_name
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          
+      - name: Run OSSAR Scan
+        uses: github/ossar-action@v1
+        if: ${{ github.event_name != 'pull_request' }}
+        
+      - name: Run Dependency Review
+        uses: actions/dependency-review-action@v3
+        if: github.event_name == 'pull_request'
+
+  e2e:
+    name: End-to-End Tests
+    needs: [test, security]
+    if: |
+      github.actor != 'dependabot[bot]' &&
+      github.repository == github.event.repository.full_name
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Check for E2E Configuration
+        id: check_files
+        run: |
+          if [ -f "playwright.config.js" ] && [ -f "package.json" ] && grep -q "\"e2e\":" "package.json"; then
+            echo "e2e_enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "e2e_enabled=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Dependencies
+        if: steps.check_files.outputs.e2e_enabled == 'true'
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          npm run e2e
+        
+      - name: Upload Test Results
+        if: steps.check_files.outputs.e2e_enabled == 'true' && always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  performance:
+    name: Performance Benchmarks
+    needs: [test, security]
+    if: |
+      github.actor != 'dependabot[bot]' &&
+      github.repository == github.event.repository.full_name
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Check for Benchmark Configuration
+        id: check_files
+        run: |
+          if [ -f "benchmark/index.js" ] && [ -f "package.json" ] && grep -q "\"benchmark\":" "package.json"; then
+            echo "benchmark_enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "benchmark_enabled=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Benchmarks
+        if: steps.check_files.outputs.benchmark_enabled == 'true'
+        run: |
+          npm ci
+          npm run benchmark
+        
+      - name: Store Benchmark Results
+        if: steps.check_files.outputs.benchmark_enabled == 'true'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'benchmarkjs'
+          output-file-path: ./benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+
+  build:
+    name: Build
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+        
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  changelog:
+    name: Generate Changelog
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Generate Changelog
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-file: './package.json'
+          
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: 'docs: update changelog'
+          title: 'docs: update changelog'
+          branch: 'docs/update-changelog'
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      github.actor != 'dependabot[bot]' &&
+      github.repository == github.event.repository.full_name &&
+      !contains(github.event.head_commit.message, '[skip deploy]')
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: dist
+
+      - name: Deploy to Vercel
+        id: deploy
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: ./
+          vercel-args: '--prod'

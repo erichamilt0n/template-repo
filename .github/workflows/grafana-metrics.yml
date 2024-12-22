@@ -1,0 +1,39 @@
+name: Grafana Metrics
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify metrics file
+        run: |
+          if [ ! -f metrics.json ]; then
+            echo "Error: metrics.json file not found"
+            exit 1
+          fi
+          
+      - name: Send metrics
+        env:
+          GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+          GRAFANA_API_URL: https://api.grafana.com/metrics/v1/push
+        run: |
+          response=$(curl -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer $GRAFANA_API_KEY" \
+            -H "Content-Type: application/json" \
+            $GRAFANA_API_URL \
+            -d @metrics.json)
+          
+          status_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response body: $body"
+          echo "Status code: $status_code"
+          
+          if [ "$status_code" -ge 400 ]; then
+            echo "Error: Failed to send metrics to Grafana"
+            exit 1
+          fi

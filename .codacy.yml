@@ -1,0 +1,22 @@
+---
+engines:
+  rubocop:
+    enabled: false
+  duplication:
+    enabled: true
+  metrics:
+    enabled: true
+  coverage:
+    enabled: true
+exclude_paths:
+  - 'node_modules/**'
+  - 'dist/**'
+  - '.git/**'
+  - 'coverage/**'
+  - 'docs/**'
+  - '*.min.js'
+  - '*.test.js'
+  - '*.spec.js'
+  - '.next/**'
+  - 'build/**'
+  - '.cache/**'

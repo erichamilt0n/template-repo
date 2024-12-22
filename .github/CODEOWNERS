@@ -1,0 +1,23 @@
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# these owners will be requested for review when someone 
+# opens a pull request.
+*       @organization/maintainers
+
+# CI/CD Configuration
+.github/workflows/    @organization/devops
+.semaphore/          @organization/devops
+vercel.json          @organization/devops
+
+# Security and Code Quality
+.codacy.yml          @organization/security
+SECURITY.md          @organization/security
+package.json         @organization/security
+
+# Documentation
+*.md                 @organization/docs
+LICENSE              @organization/legal
+
+# Source Code
+/src/               @organization/developers
+/test/              @organization/developers

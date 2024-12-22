@@ -1,0 +1,60 @@
+version: v1.0
+name: CI/CD Pipeline
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu22.04
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - nvm use 18
+      - node --version
+      - npm --version
+
+blocks:
+  - name: "Install Dependencies"
+    task:
+      jobs:
+        - name: "npm install"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json)
+            - npm ci
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+
+  - name: "Lint"
+    task:
+      jobs:
+        - name: "Code Quality"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json)
+            - npm run lint
+            - npm run format:check
+
+  - name: "Test"
+    task:
+      jobs:
+        - name: "Unit Tests"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json)
+            - npm test
+        - name: "Integration Tests"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json)
+            - npm run test:integration
+
+  - name: "Build"
+    task:
+      jobs:
+        - name: "Production Build"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json)
+            - npm run build
+            - cache store build-$SEMAPHORE_GIT_BRANCH-$SEMAPHORE_WORKFLOW_ID dist
+
+promotions:
+  - name: Deploy to Production
+    pipeline_file: deploy-prod.yml
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"
